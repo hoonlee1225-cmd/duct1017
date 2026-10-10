@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#123b5d">
+  <meta name="description" content="국소배기장치 필요환기량 계산기">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icon-192.png">
+  <title>국소배기 필요환기량 계산기</title>
+  <style>
+    :root { color-scheme: light; --navy:#123b5d; --blue:#1769aa; --bg:#f3f6f9; --line:#d8e0e8; --muted:#5e6b78; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:#17212b; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif; }
+    header { background:var(--navy); color:white; padding:22px 18px 20px; }
+    header h1 { margin:0 0 7px; font-size:1.35rem; line-height:1.35; }
+    header p { margin:0; font-size:.88rem; opacity:.9; }
+    main { max-width:760px; margin:0 auto; padding:16px; }
+    .card { background:white; border:1px solid var(--line); border-radius:16px; padding:17px; margin-bottom:14px; box-shadow:0 2px 8px #122b3b0a; }
+    h2 { font-size:1.05rem; margin:0 0 13px; }
+    .choices { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+    .choices.two { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .choice { display:flex; align-items:center; gap:7px; border:1px solid var(--line); padding:11px 9px; border-radius:10px; font-size:.9rem; }
+    .choice:has(input:checked) { border-color:var(--blue); background:#edf6ff; }
+    input[type=radio] { accent-color:var(--blue); }
+    .fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+    label { font-size:.86rem; font-weight:650; }
+    input[type=text], select { width:100%; min-width:0; padding:12px; border:1px solid #b9c6d2; border-radius:9px; font:inherit; font-size:1rem; background:white; color:#17212b; }
+    input:focus, select:focus { outline:2px solid #9acbfa; border-color:var(--blue); }
+    .hint { color:var(--muted); font-size:.82rem; line-height:1.5; margin:10px 0 0; }
+    .hidden { display:none !important; }
+    .result { background:#eef6fc; border:1px solid #c8e1f5; border-radius:13px; padding:17px; }
+    .result-label { color:#4e6272; font-size:.9rem; }
+    .big { color:var(--navy); font-size:2rem; font-weight:800; letter-spacing:-.03em; margin:5px 0 14px; overflow-wrap:anywhere; }
+    .secondary { font-size:1.25rem; font-weight:750; margin-top:4px; }
+    .actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
+    button { border:0; border-radius:10px; padding:12px 14px; background:var(--blue); color:white; font-weight:700; font-size:.92rem; cursor:pointer; }
+    button.secondary-btn { background:#e7edf2; color:#243746; }
+    button.danger { background:#fff0f0; color:#9b2525; }
+    .history-item { border-top:1px solid var(--line); padding:12px 0; }
+    .history-item:first-child { border-top:0; }
+    .history-title { font-weight:700; margin-bottom:5px; }
+    .history-value { font-variant-numeric:tabular-nums; }
+    footer { max-width:760px; padding:0 18px 28px; margin:auto; color:var(--muted); font-size:.78rem; line-height:1.55; }
+    @media(max-width:420px) { main { padding:11px; } .card { padding:14px; } .choices { grid-template-columns:1fr; } .fields { gap:10px; } .big { font-size:1.75rem; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>국소배기 필요환기량 계산기</h1>
+  <p>필요환기량 CMM 및 시간당 환기량 계산 · 결과 소수점 둘째 자리 표시</p>
+</header>
+<main>
+  <section class="card">
+    <h2>1. 후드 종류</h2>
+    <div class="choices" role="radiogroup" aria-label="후드 종류">
+      <label class="choice"><input type="radio" name="hood" value="booth" checked> 부스식/밀폐식</label>
+      <label class="choice"><input type="radio" name="hood" value="external"> 외부식</label>
+      <label class="choice"><input type="radio" name="hood" value="canopy"> 캐노피형</label>
+    </div>
+  </section>
+
+  <section class="card" id="boothFields">
+    <h2>2. 부스식 입력값</h2>
+    <div class="fields">
+      <div class="field"><label for="boothV">제어속도 Vc (m/s)</label><input id="boothV" type="text" inputmode="decimal" value="0.5"></div>
+      <div class="field"><label for="boothW">개구면 가로 W (m)</label><input id="boothW" type="text" inputmode="decimal" value="1"></div>
+      <div class="field"><label for="boothH">개구면 높이 H (m)</label><input id="boothH" type="text" inputmode="decimal" value="1"></div>
+    </div>
+    <p class="hint">공식: Q = Vc × W × H × 60</p>
+  </section>
+
+  <section class="card hidden" id="externalFields">
+    <h2>2. 외부식 후드 입력값</h2>
+    <div class="field">
+      <label for="externalType">후드 유형</label>
+      <select id="externalType">
+        <option value="general">일반형</option>
+        <option value="flangeGeneral">플랜지 일반형</option>
+        <option value="slot">슬롯형</option>
+        <option value="flangeSlot">플랜지 슬롯형</option>
+      </select>
+    </div>
+    <div id="shapeGroup" style="margin-top:13px">
+      <label>개구면 형상</label>
+      <div class="choices two" style="margin-top:7px">
+        <label class="choice"><input type="radio" name="shape" value="rectangle" checked> 사각형</label>
+        <label class="choice"><input type="radio" name="shape" value="circle"> 원형</label>
+      </div>
+    </div>
+    <div class="fields" style="margin-top:13px">
+      <div class="field" id="areaField"><label for="area">개구면적 A (m²)</label><input id="area" type="text" inputmode="decimal" value="1"></div>
+      <div class="field hidden" id="diameterField"><label for="diameter">후드 지름 (m)</label><input id="diameter" type="text" inputmode="decimal" value="1"></div>
+      <div class="field"><label for="externalV">제어속도 V (m/s)</label><input id="externalV" type="text" inputmode="decimal" value="0.5"></div>
+      <div class="field"><label for="x">오염원까지 거리 X (m)</label><input id="x" type="text" inputmode="decimal" value="0.3"></div>
+      <div class="field hidden" id="lengthField"><label for="length">슬롯 길이 L (m)</label><input id="length" type="text" inputmode="decimal" value="1"></div>
+    </div>
+    <p class="hint" id="externalHint">일반형 계열은 원식 결과가 m³/s라는 전제하에 ×60을 적용합니다. 원형 개구면적은 π × 지름² ÷ 4로 계산합니다.</p>
+  </section>
+
+  <section class="card hidden" id="canopyFields">
+    <h2>2. 캐노피형 입력값</h2>
+    <div class="fields">
+      <div class="field"><label for="perimeter">후드 개구면 둘레 P (m)</label><input id="perimeter" type="text" inputmode="decimal" value="4"></div>
+      <div class="field"><label for="canopyV">제어속도 V (m/s)</label><input id="canopyV" type="text" inputmode="decimal" value="0.5"></div>
+      <div class="field"><label for="distanceD">오염원-후드 거리 D (m)</label><input id="distanceD" type="text" inputmode="decimal" value="0.5"></div>
+    </div>
+    <p class="hint">공식: Q = 1.4 × P × V × D. 여기서 D는 오염원과 후드 개구면 사이의 거리입니다.</p>
+  </section>
+
+  <section class="card">
+    <h2>계산 결과</h2>
+    <div id="error" class="hint hidden" role="alert" style="color:#a32222;margin-bottom:10px">입력값을 확인해 주세요. 0 이상의 숫자를 입력해야 합니다.</div>
+    <div class="result" aria-live="polite">
+      <div class="result-label">필요환기량</div>
+      <div class="big"><span id="cmm">30.00</span> CMM</div>
+      <div class="result-label">시간당 환기량</div>
+      <div class="secondary"><span id="hourly">1,800.00</span> m³/h</div>
+    </div>
+    <div class="actions">
+      <button id="saveHistory">계산 이력 저장</button>
+      <button id="copyResult" class="secondary-btn">결과 복사</button>
+      <button id="reset" class="secondary-btn">입력값 초기화</button>
+    </div>
+    <p class="hint">CMM = m³/min. 모든 결과는 항상 소수점 둘째 자리까지 표시합니다.</p>
+  </section>
+
+  <section class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h2 style="margin:0">계산 이력</h2>
+      <button id="clearHistory" class="danger">이력 삭제</button>
+    </div>
+    <div id="history" style="margin-top:8px"><p class="hint">저장된 계산 이력이 없습니다.</p></div>
+  </section>
+</main>
+<footer>
+  참고: 이 계산기는 입력된 공식에 따른 계산 보조 도구입니다. 실제 설계·법정 기준 적용 전에는 공식의 적용 조건, 단위 및 환산계수를 원본 기준과 대조하십시오. 브라우저의 로컬 저장소를 사용하므로 이력은 해당 기기·브라우저에 저장됩니다.
+</footer>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const num = id => {
+    const raw = $(id).value.trim().replace(/,/g, ".");
+    if (raw === "") return NaN;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : NaN;
+  };
+  const fmt = n => n.toLocaleString("ko-KR", {minimumFractionDigits:2, maximumFractionDigits:2});
+  const getHood = () => document.querySelector('input[name="hood"]:checked').value;
+  const getShape = () => document.querySelector('input[name="shape"]:checked').value;
+  let current = {q:30, hood:"booth", label:"부스식/밀폐식"};
+
+  function updateVisibility() {
+    const hood = getHood();
+    $("boothFields").classList.toggle("hidden", hood !== "booth");
+    $("externalFields").classList.toggle("hidden", hood !== "external");
+    $("canopyFields").classList.toggle("hidden", hood !== "canopy");
+    const type = $("externalType").value;
+    const slot = type === "slot" || type === "flangeSlot";
+    $("shapeGroup").classList.toggle("hidden", slot);
+    $("areaField").classList.toggle("hidden", slot || getShape() === "circle");
+    $("diameterField").classList.toggle("hidden", slot || getShape() !== "circle");
+    $("lengthField").classList.toggle("hidden", !slot);
+    $("externalHint").textContent = slot
+      ? "공식: 슬롯형 Q = 3.7 × L × V × X, 플랜지 슬롯형 Q = 2.6 × L × V × X. 제시된 계수 기준으로 CMM을 직접 계산합니다."
+      : "일반형 계열은 원식 결과가 m³/s라는 전제하에 ×60을 적용합니다. 원형 개구면적은 π × 지름² ÷ 4로 계산합니다.";
+  }
+  function calculate() {
+    updateVisibility();
+    const hood = getHood();
+    let q = NaN, label = "";
+    if (hood === "booth") {
+      const V=num("boothV"), W=num("boothW"), H=num("boothH");
+      q=V*W*H*60; label="부스식/밀폐식";
+    } else if (hood === "external") {
+      const type=$("externalType").value, V=num("externalV"), X=num("x");
+      if (type === "slot") { q=3.7*num("length")*V*X; label="외부식 - 슬롯형"; }
+      else if (type === "flangeSlot") { q=2.6*num("length")*V*X; label="외부식 - 플랜지 슬롯형"; }
+      else {
+        const A = getShape() === "circle" ? Math.PI*Math.pow(num("diameter"),2)/4 : num("area");
+        q=(type === "flangeGeneral" ? 0.75 : 1)*V*(10*X*X+A)*60;
+        label=type === "flangeGeneral" ? "외부식 - 플랜지 일반형" : "외부식 - 일반형";
+      }
+    } else {
+      q=1.4*num("perimeter")*num("canopyV")*num("distanceD"); label="캐노피형";
+    }
+    const valid = Number.isFinite(q) && q >= 0;
+    $("error").classList.toggle("hidden", valid);
+    if (valid) {
+      current={q, hood, label};
+      $("cmm").textContent=fmt(q);
+      $("hourly").textContent=fmt(q*60);
+    } else {
+      $("cmm").textContent="—";
+      $("hourly").textContent="—";
+    }
+  }
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem("ventCalcHistory") || "[]"); } catch { return []; }
+  }
+  function renderHistory() {
+    const hist=loadHistory(), box=$("history");
+    box.replaceChildren();
+    if (!hist.length) { const p=document.createElement("p"); p.className="hint"; p.textContent="저장된 계산 이력이 없습니다."; box.appendChild(p); return; }
+    hist.forEach(item => {
+      const div=document.createElement("div"); div.className="history-item";
+      const title=document.createElement("div"); title.className="history-title"; title.textContent=item.label;
+      const value=document.createElement("div"); value.className="history-value"; value.textContent=`${item.cmm} CMM · ${item.hourly} m³/h`;
+      const date=document.createElement("div"); date.className="hint"; date.textContent=item.date;
+      div.append(title,value,date); box.appendChild(div);
+    });
+  }
+  document.querySelectorAll('input[name="hood"],input[name="shape"]').forEach(el=>el.addEventListener("change",calculate));
+  document.querySelectorAll("input[type=text],select").forEach(el=>el.addEventListener("input",calculate));
+  $("externalType").addEventListener("change",calculate);
+  $("saveHistory").addEventListener("click",()=>{
+    calculate();
+    if (!Number.isFinite(current.q)) return;
+    const hist=loadHistory();
+    hist.unshift({label:current.label,cmm:fmt(current.q),hourly:fmt(current.q*60),date:new Date().toLocaleString("ko-KR")});
+    localStorage.setItem("ventCalcHistory",JSON.stringify(hist.slice(0,20)));
+    renderHistory();
+  });
+  $("copyResult").addEventListener("click",async()=>{
+    calculate();
+    if (!Number.isFinite(current.q)) return;
+    const text=`${current.label}\n필요환기량: ${fmt(current.q)} CMM\n시간당 환기량: ${fmt(current.q*60)} m³/h`;
+    try { await navigator.clipboard.writeText(text); $("copyResult").textContent="복사 완료"; setTimeout(()=>$("copyResult").textContent="결과 복사",1600); }
+    catch { window.prompt("아래 결과를 복사하세요.",text); }
+  });
+  $("clearHistory").addEventListener("click",()=>{ if(confirm("저장된 계산 이력을 모두 삭제할까요?")) {localStorage.removeItem("ventCalcHistory");renderHistory();} });
+  $("reset").addEventListener("click",()=>{
+    document.querySelector('input[name="hood"][value="booth"]').checked=true;
+    document.querySelector('input[name="shape"][value="rectangle"]').checked=true;
+    $("boothV").value="0.5"; $("boothW").value="1"; $("boothH").value="1";
+    $("externalType").value="general"; $("area").value="1"; $("diameter").value="1"; $("externalV").value="0.5"; $("x").value="0.3"; $("length").value="1";
+    $("perimeter").value="4"; $("canopyV").value="0.5"; $("distanceD").value="0.5";
+    calculate();
+  });
+  calculate(); renderHistory();
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(()=>{}));
+  }
+})();
+</script>
+</body>
+</html>
