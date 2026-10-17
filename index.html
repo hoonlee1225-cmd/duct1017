@@ -90,8 +90,9 @@
       </div>
     </div>
     <div class="fields" style="margin-top:13px">
-      <div class="field" id="areaField"><label for="area">개구면적 A (m²)</label><input id="area" type="text" inputmode="decimal" value="1"></div>
-      <div class="field hidden" id="diameterField"><label for="diameter">후드 지름 (m)</label><input id="diameter" type="text" inputmode="decimal" value="1"></div>
+      <div class="field" id="rectWidthField"><label for="rectWidth">사각형 후드 개구부 가로 W (m)</label><input id="rectWidth" type="text" inputmode="decimal" value="1"></div>
+      <div class="field" id="rectHeightField"><label for="rectHeight">사각형 후드 개구부 높이 H (m)</label><input id="rectHeight" type="text" inputmode="decimal" value="1"></div>
+      <div class="field hidden" id="diameterField"><label for="diameter">원형 후드 지름 D (m)</label><input id="diameter" type="text" inputmode="decimal" value="1"></div>
       <div class="field"><label for="externalV">제어속도 V (m/s)</label><input id="externalV" type="text" inputmode="decimal" value="0.5"></div>
       <div class="field"><label for="x">오염원까지 거리 X (m)</label><input id="x" type="text" inputmode="decimal" value="0.3"></div>
       <div class="field hidden" id="lengthField"><label for="length">슬롯 길이 L (m)</label><input id="length" type="text" inputmode="decimal" value="1"></div>
@@ -159,12 +160,13 @@
     const type = $("externalType").value;
     const slot = type === "slot" || type === "flangeSlot";
     $("shapeGroup").classList.toggle("hidden", slot);
-    $("areaField").classList.toggle("hidden", slot || getShape() === "circle");
+    $("rectWidthField").classList.toggle("hidden", slot || getShape() !== "rectangle");
+    $("rectHeightField").classList.toggle("hidden", slot || getShape() !== "rectangle");
     $("diameterField").classList.toggle("hidden", slot || getShape() !== "circle");
     $("lengthField").classList.toggle("hidden", !slot);
     $("externalHint").textContent = slot
       ? "공식: 슬롯형 Q = 3.7 × L × V × X, 플랜지 슬롯형 Q = 2.6 × L × V × X. 제시된 계수 기준으로 CMM을 직접 계산합니다."
-      : "일반형 계열은 원식 결과가 m³/s라는 전제하에 ×60을 적용합니다. 원형 개구면적은 π × 지름² ÷ 4로 계산합니다.";
+      : "사각형 개구면적 A = 가로 W × 높이 H, 원형 개구면적 A = π × 지름² ÷ 4로 계산합니다. 일반형 계열은 원식 결과가 m³/s라는 전제하에 ×60을 적용합니다.";
   }
   function calculate() {
     updateVisibility();
@@ -178,7 +180,7 @@
       if (type === "slot") { q=3.7*num("length")*V*X; label="외부식 - 슬롯형"; }
       else if (type === "flangeSlot") { q=2.6*num("length")*V*X; label="외부식 - 플랜지 슬롯형"; }
       else {
-        const A = getShape() === "circle" ? Math.PI*Math.pow(num("diameter"),2)/4 : num("area");
+        const A = getShape() === "circle" ? Math.PI*Math.pow(num("diameter"),2)/4 : num("rectWidth")*num("rectHeight");
         q=(type === "flangeGeneral" ? 0.75 : 1)*V*(10*X*X+A)*60;
         label=type === "flangeGeneral" ? "외부식 - 플랜지 일반형" : "외부식 - 일반형";
       }
@@ -234,7 +236,7 @@
     document.querySelector('input[name="hood"][value="booth"]').checked=true;
     document.querySelector('input[name="shape"][value="rectangle"]').checked=true;
     $("boothV").value="0.5"; $("boothW").value="1"; $("boothH").value="1";
-    $("externalType").value="general"; $("area").value="1"; $("diameter").value="1"; $("externalV").value="0.5"; $("x").value="0.3"; $("length").value="1";
+    $("externalType").value="general"; $("rectWidth").value="1"; $("rectHeight").value="1"; $("diameter").value="1"; $("externalV").value="0.5"; $("x").value="0.3"; $("length").value="1";
     $("perimeter").value="4"; $("canopyV").value="0.5"; $("distanceD").value="0.5";
     calculate();
   });
