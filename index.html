@@ -138,10 +138,22 @@
     </div>
     <p class="hint">공식: Dmax = √(4Q ÷ (π × Vd,min)) × 1,000. 후드 계산 결과 CMM을 60으로 나누어 Q(m³/s)로 자동 환산합니다. 결과는 이론상 최대 직경입니다.</p>
     <div class="result" aria-live="polite" style="margin-top:12px">
-      <div class="result-label">최소 반송속도를 만족하는 최대 원형 덕트 직경</div>
+      <div class="result-label">최소 반송속도를 만족하는 이론상 최대 원형 덕트 직경</div>
       <div class="big"><span id="ductD">356.82</span> mm</div>
-      <div class="result-label">실제 선정 시 계산값 이하의 표준 덕트 직경을 선택하고 압력손실 및 분진 특성을 확인하세요.</div>
+      <div class="result-label">표준 규격 중 이론상 최대 직경 이하에서 가장 큰 규격을 우선 추천합니다.</div>
     </div>
+    <div class="result" aria-live="polite" style="margin-top:12px">
+      <div class="result-label">추천 상용 덕트 규격 (원형, 호칭 직경)</div>
+      <div class="big"><span id="commercialDuct">350</span> mm</div>
+      <div class="result-label">추천 규격 적용 시 실제 반송속도</div>
+      <div class="secondary"><span id="commercialVelocity">5.20</span> m/s</div>
+      <p class="hint" id="commercialNote" style="margin-bottom:0">계산값 이하의 표준 규격을 추천합니다.</p>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label for="ductSizeSelect">표준 덕트 규격 직접 선택</label>
+      <select id="ductSizeSelect"></select>
+    </div>
+    <div class="hint" id="selectedDuctResult" aria-live="polite">선택 규격의 실제 반송속도: 5.20 m/s</div>
     <div id="ductError" class="hint hidden" role="alert" style="color:#a32222">후드 필요환기량이 유효하고 최소 반송속도 Vd는 0보다 커야 합니다.</div>
   </section>
 
@@ -154,7 +166,7 @@
   </section>
 </main>
 <footer>
-  참고: 이 계산기는 입력된 공식에 따른 계산 보조 도구입니다. 실제 설계·법정 기준 적용 전에는 공식의 적용 조건, 단위 및 환산계수를 원본 기준과 대조하십시오. 브라우저의 로컬 저장소를 사용하므로 이력은 해당 기기·브라우저에 저장됩니다.
+  참고: 이 계산기는 입력된 공식에 따른 계산 보조 도구입니다. 상용 덕트 규격은 대표적인 원형 호칭 직경 목록을 기준으로 추천하므로, 실제 설계 전에는 제조사 규격·압력손실·분진 특성·법정 기준을 확인하십시오. 공식의 적용 조건, 단위 및 환산계수도 원본 기준과 대조하십시오. 브라우저의 로컬 저장소를 사용하므로 이력은 해당 기기·브라우저에 저장됩니다.
 </footer>
 <script>
 (() => {
@@ -252,6 +264,12 @@
     try { await navigator.clipboard.writeText(text); $("copyResult").textContent="복사 완료"; setTimeout(()=>$("copyResult").textContent="결과 복사",1600); }
     catch { window.prompt("아래 결과를 복사하세요.",text); }
   });
+  // 대표적인 원형 상용 덕트 호칭 직경(mm). 실제 공급 규격은 제조사/현장 기준을 확인합니다.
+  const commercialDuctSizes = [75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 315, 325, 350, 355, 375, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 1000, 1100, 1200, 1300, 1400, 1500];
+  function velocityAtDiameter(q, diameterMm) {
+    const d = diameterMm / 1000;
+    return q / (Math.PI * d * d / 4);
+  }
   function calculateDuctDiameter() {
     const qRaw = $("ductQ").value.trim().replace(/,/g, ".");
     const vRaw = $("ductV").value.trim().replace(/,/g, ".");
@@ -259,10 +277,71 @@
     const v = vRaw === "" ? NaN : Number(vRaw);
     const valid = Number.isFinite(q) && q >= 0 && Number.isFinite(v) && v > 0;
     $("ductError").classList.toggle("hidden", valid);
-    if (!valid) { $("ductD").textContent = "—"; return; }
-    $("ductD").textContent = fmt(Math.sqrt((4 * q) / (Math.PI * v)) * 1000);
+    if (!valid) {
+      $("ductD").textContent = "—";
+      $("commercialDuct").textContent = "—";
+      $("commercialVelocity").textContent = "—";
+      $("commercialNote").textContent = "입력값을 확인하세요.";
+      $("selectedDuctResult").textContent = "선택 규격의 실제 반송속도: —";
+      return;
+    }
+
+    const dMax = Math.sqrt((4 * q) / (Math.PI * v)) * 1000;
+    $("ductD").textContent = fmt(dMax);
+
+    const select = $("ductSizeSelect");
+    const previous = Number(select.value);
+    const fitting = commercialDuctSizes.filter(d => d <= dMax);
+    const recommended = fitting.length ? fitting[fitting.length - 1] : null;
+
+    // Keep the list of standard sizes up to the calculated maximum, so every selectable
+    // size satisfies the minimum transport velocity (subject to the chosen assumptions).
+    const allowed = commercialDuctSizes.filter(d => d <= dMax);
+    select.replaceChildren();
+    if (!allowed.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "조건에 맞는 규격 없음";
+      select.appendChild(option);
+      select.disabled = true;
+      $("commercialDuct").textContent = "—";
+      $("commercialVelocity").textContent = "—";
+      $("commercialNote").textContent = "계산된 최대 직경보다 작은 대표 규격이 없습니다. 풍량·속도 조건과 공급 규격을 확인하세요.";
+      $("selectedDuctResult").textContent = "선택 규격의 실제 반송속도: —";
+      return;
+    }
+
+    select.disabled = false;
+    allowed.forEach(d => {
+      const option = document.createElement("option");
+      option.value = String(d);
+      option.textContent = `Ø${d} mm`;
+      select.appendChild(option);
+    });
+    const chosen = allowed.includes(previous) ? previous : recommended;
+    select.value = String(chosen);
+
+    $("commercialDuct").textContent = String(recommended);
+    $("commercialVelocity").textContent = fmt(velocityAtDiameter(q, recommended));
+    $("commercialNote").textContent = `대표 규격 Ø${recommended} mm를 추천합니다. 제조사별 실제 호칭 규격과 압력손실을 확인하세요.`;
+    updateSelectedDuctVelocity();
+  }
+  function updateSelectedDuctVelocity() {
+    const qRaw = $("ductQ").value.trim().replace(/,/g, ".");
+    const q = qRaw === "" ? NaN : Number(qRaw);
+    const d = Number($("ductSizeSelect").value);
+    if (!Number.isFinite(q) || q < 0 || !Number.isFinite(d) || d <= 0) {
+      $("selectedDuctResult").textContent = "선택 규격의 실제 반송속도: —";
+      return;
+    }
+    const velocity = velocityAtDiameter(q, d);
+    const vMinRaw = $("ductV").value.trim().replace(/,/g, ".");
+    const vMin = Number(vMinRaw);
+    const status = velocity >= vMin ? "최소 반송속도 충족" : "최소 반송속도 미달";
+    $("selectedDuctResult").textContent = `선택 규격 Ø${d} mm의 실제 반송속도: ${fmt(velocity)} m/s · ${status}`;
   }
   $("ductV").addEventListener("input", calculateDuctDiameter);
+  $("ductSizeSelect").addEventListener("change", updateSelectedDuctVelocity);
   calculateDuctDiameter();
 
   $("clearHistory").addEventListener("click",()=>{ if(confirm("저장된 계산 이력을 모두 삭제할까요?")) {localStorage.removeItem("ventCalcHistory");renderHistory();} });
