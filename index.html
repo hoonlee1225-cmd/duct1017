@@ -127,6 +127,24 @@
     <p class="hint">CMM = m³/min. 모든 결과는 항상 소수점 둘째 자리까지 표시합니다.</p>
   </section>
 
+
+
+  <section class="card" id="ductDiameterCard">
+    <h2>덕트 직경 계산기</h2>
+    <p class="hint" style="margin-top:0">풍량 Q와 덕트 내 설계 풍속 V로 원형 덕트의 직경을 계산합니다.</p>
+    <div class="fields">
+      <div class="field"><label for="ductQ">풍량 Q (m³/s)</label><input id="ductQ" type="text" inputmode="decimal" value="1.00"></div>
+      <div class="field"><label for="ductV">덕트 내 풍속 V (m/s)</label><input id="ductV" type="text" inputmode="decimal" value="10.0"></div>
+    </div>
+    <p class="hint">공식: D = √(4Q ÷ (πV)) × 1,000. Q는 m³/s, V는 m/s, 결과 D는 mm입니다.</p>
+    <div class="result" aria-live="polite" style="margin-top:12px">
+      <div class="result-label">계산된 원형 덕트 직경</div>
+      <div class="big"><span id="ductD">356.82</span> mm</div>
+      <div class="result-label">계산값은 이론 직경입니다. 실제 설계 시 표준 덕트 규격과 압력손실을 확인하세요.</div>
+    </div>
+    <div id="ductError" class="hint hidden" role="alert" style="color:#a32222">Q는 0 이상, 풍속 V는 0보다 큰 숫자를 입력해 주세요.</div>
+  </section>
+
   <section class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
       <h2 style="margin:0">계산 이력</h2>
@@ -231,6 +249,19 @@
     try { await navigator.clipboard.writeText(text); $("copyResult").textContent="복사 완료"; setTimeout(()=>$("copyResult").textContent="결과 복사",1600); }
     catch { window.prompt("아래 결과를 복사하세요.",text); }
   });
+  function calculateDuctDiameter() {
+    const qRaw = $("ductQ").value.trim().replace(/,/g, ".");
+    const vRaw = $("ductV").value.trim().replace(/,/g, ".");
+    const q = qRaw === "" ? NaN : Number(qRaw);
+    const v = vRaw === "" ? NaN : Number(vRaw);
+    const valid = Number.isFinite(q) && q >= 0 && Number.isFinite(v) && v > 0;
+    $("ductError").classList.toggle("hidden", valid);
+    if (!valid) { $("ductD").textContent = "—"; return; }
+    $("ductD").textContent = fmt(Math.sqrt((4 * q) / (Math.PI * v)) * 1000);
+  }
+  ["ductQ", "ductV"].forEach(id => $(id).addEventListener("input", calculateDuctDiameter));
+  calculateDuctDiameter();
+
   $("clearHistory").addEventListener("click",()=>{ if(confirm("저장된 계산 이력을 모두 삭제할까요?")) {localStorage.removeItem("ventCalcHistory");renderHistory();} });
   $("reset").addEventListener("click",()=>{
     document.querySelector('input[name="hood"][value="booth"]').checked=true;
