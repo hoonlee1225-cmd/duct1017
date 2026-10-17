@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#123b5d">
+  <meta name="description" content="국소배기 필요환기량 및 덕트 직경 계산기">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icon-192.png">
+  <title>국소배기 필요환기량, 덕트 직경 계산기</title>
+  <style>
+    :root { color-scheme: light; --navy:#123b5d; --blue:#1769aa; --bg:#f3f6f9; --line:#d8e0e8; --muted:#5e6b78; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:#17212b; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif; }
+    header { background:var(--navy); color:white; padding:22px 18px 20px; }
+    header h1 { margin:0 0 7px; font-size:1.35rem; line-height:1.35; }
+    header p { margin:0; font-size:.88rem; opacity:.9; }
+    main { max-width:760px; margin:0 auto; padding:16px; }
+    .card { background:white; border:1px solid var(--line); border-radius:16px; padding:17px; margin-bottom:14px; box-shadow:0 2px 8px #122b3b0a; }
+    h2 { font-size:1.05rem; margin:0 0 13px; }
+    .choices { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+    .choices.two { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .choice { display:flex; align-items:center; gap:7px; border:1px solid var(--line); padding:11px 9px; border-radius:10px; font-size:.9rem; }
+    .choice:has(input:checked) { border-color:var(--blue); background:#edf6ff; }
+    input[type=radio] { accent-color:var(--blue); }
+    .fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+    label { font-size:.86rem; font-weight:650; }
+    input[type=text], select { width:100%; min-width:0; padding:12px; border:1px solid #b9c6d2; border-radius:9px; font:inherit; font-size:1rem; background:white; color:#17212b; }
+    input:focus, select:focus { outline:2px solid #9acbfa; border-color:var(--blue); }
+    .hint { color:var(--muted); font-size:.82rem; line-height:1.5; margin:10px 0 0; }
+    .hidden { display:none !important; }
+    .result { background:#eef6fc; border:1px solid #c8e1f5; border-radius:13px; padding:17px; }
+    .result-label { color:#4e6272; font-size:.9rem; }
+    .big { color:var(--navy); font-size:2rem; font-weight:800; letter-spacing:-.03em; margin:5px 0 14px; overflow-wrap:anywhere; }
+    .secondary { font-size:1.25rem; font-weight:750; margin-top:4px; }
+    .actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
+    button { border:0; border-radius:10px; padding:12px 14px; background:var(--blue); color:white; font-weight:700; font-size:.92rem; cursor:pointer; }
+    button.secondary-btn { background:#e7edf2; color:#243746; }
+    button.danger { background:#fff0f0; color:#9b2525; }
+    .history-item { border-top:1px solid var(--line); padding:12px 0; }
+    .history-item:first-child { border-top:0; }
+    .history-title { font-weight:700; margin-bottom:5px; }
+    .history-value { font-variant-numeric:tabular-nums; }
+    footer { max-width:760px; padding:0 18px 28px; margin:auto; color:var(--muted); font-size:.78rem; line-height:1.55; }
+    @media(max-width:420px) { main { padding:11px; } .card { padding:14px; } .choices { grid-template-columns:1fr; } .fields { gap:10px; } .big { font-size:1.75rem; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>국소배기 필요환기량, 덕트 직경 계산기</h1>
+  <p>필요환기량 계산 → 상용 덕트 선정 → 반송속도·속도압 자동 계산</p>
+</header>
+<main>
+  <section class="card">
+    <h2>1. 후드 종류</h2>
+    <div class="choices" role="radiogroup" aria-label="후드 종류">
+      <label class="choice"><input type="radio" name="hood" value="booth" checked> 부스식/밀폐식</label>
+      <label class="choice"><input type="radio" name="hood" value="external"> 외부식</label>
+      <label class="choice"><input type="radio" name="hood" value="canopy"> 캐노피형</label>
+    </div>
+  </section>
+
+  <section class="card" id="boothFields">
+    <h2>2. 부스식 입력값</h2>
+    <div class="fields">
+      <div class="field"><label for="boothV">제어속도 Vc (m/s)</label><input id="boothV" type="text" inputmode="decimal" value="0.5"></div>
+      <div class="field"><label for="boothW">개구면 가로 W (m)</label><input id="boothW" type="text" inputmode="decimal" value="1"></div>
+      <div class="field"><label for="boothH">개구면 높이 H (m)</label><input id="boothH" type="text" inputmode="decimal" value="1"></div>
+    </div>
+    <p class="hint">공식: Q = Vc × W × H × 60</p>
+  </section>
+
+  <section class="card hidden" id="externalFields">
+    <h2>2. 외부식 후드 입력값</h2>
+    <div class="field">
+      <label for="externalType">후드 유형</label>
+      <select id="externalType">
+        <option value="general">일반형</option>
+        <option value="flangeGeneral">플랜지 일반형</option>
+        <option value="slot">슬롯형</option>
+        <option value="flangeSlot">플랜지 슬롯형</option>
+      </select>
+    </div>
+    <div id="shapeGroup" style="margin-top:13px">
+      <label>개구면 형상</label>
+      <div class="choices two" style="margin-top:7px">
+        <label class="choice"><input type="radio" name="shape" value="rectangle" checked> 사각형</label>
+        <label class="choice"><input type="radio" name="shape" value="circle"> 원형</label>
+      </div>
+    </div>
+    <div class="fields" style="margin-top:13px">
+      <div class="field" id="rectWidthField"><label for="rectWidth">사각형 후드 개구부 가로 W (m)</label><input id="rectWidth" type="text" inputmode="decimal" value="1"></div>
+      <div class="field" id="rectHeightField"><label for="rectHeight">사각형 후드 개구부 높이 H (m)</label><input id="rectHeight" type="text" inputmode="decimal" value="1"></div>
+      <div class="field hidden" id="diameterField"><label for="diameter">원형 후드 지름 D (m)</label><input id="diameter" type="text" inputmode="decimal" value="1"></div>
+      <div class="field"><label for="externalV">제어속도 V (m/s)</label><input id="externalV" type="text" inputmode="decimal" value="0.5"></div>
+      <div class="field"><label for="x">오염원까지 거리 X (m)</label><input id="x" type="text" inputmode="decimal" value="0.3"></div>
+      <div class="field hidden" id="lengthField"><label for="length">슬롯 길이 L (m)</label><input id="length" type="text" inputmode="decimal" value="1"></div>
+    </div>
+    <p class="hint" id="externalHint">일반형 계열은 원식 결과가 m³/s라는 전제하에 ×60을 적용합니다. 원형 개구면적은 π × 지름² ÷ 4로 계산합니다.</p>
+  </section>
+
+  <section class="card hidden" id="canopyFields">
+    <h2>2. 캐노피형 입력값</h2>
+    <div class="fields">
+      <div class="field"><label for="perimeter">후드 개구면 둘레 P (m)</label><input id="perimeter" type="text" inputmode="decimal" value="4"></div>
+      <div class="field"><label for="canopyV">제어속도 V (m/s)</label><input id="canopyV" type="text" inputmode="decimal" value="0.5"></div>
+      <div class="field"><label for="distanceD">오염원-후드 거리 D (m)</label><input id="distanceD" type="text" inputmode="decimal" value="0.5"></div>
+    </div>
+    <p class="hint">공식: Q = 1.4 × P × V × D. 여기서 D는 오염원과 후드 개구면 사이의 거리입니다.</p>
+  </section>
+
+  <section class="card">
+    <h2>계산 결과</h2>
+    <div id="error" class="hint hidden" role="alert" style="color:#a32222;margin-bottom:10px">입력값을 확인해 주세요. 0 이상의 숫자를 입력해야 합니다.</div>
+    <div class="result" aria-live="polite">
+      <div class="result-label">필요환기량</div>
+      <div class="big"><span id="cmm">30.00</span> CMM</div>
+      <div class="result-label">시간당 환기량</div>
+      <div class="secondary"><span id="hourly">1,800.00</span> m³/h</div>
+    </div>
+    <div class="actions">
+      <button id="saveHistory">계산 이력 저장</button>
+      <button id="copyResult" class="secondary-btn">결과 복사</button>
+      <button id="reset" class="secondary-btn">입력값 초기화</button>
+    </div>
+    <p class="hint">CMM = m³/min. 모든 결과는 항상 소수점 둘째 자리까지 표시합니다.</p>
+  </section>
+
+
+
+  <section class="card" id="ductDiameterCard">
+    <h2>최소 반송속도 기준 덕트 최대 직경</h2>
+    <p class="hint" style="margin-top:0">위에서 계산한 후드 필요환기량을 자동으로 연결합니다. 최소 반송속도를 만족하는 원형 덕트의 이론상 최대 직경을 계산합니다.</p>
+    <div class="fields">
+      <div class="field"><label for="ductQ">후드 필요환기량 Q (m³/s, 자동 연결)</label><input id="ductQ" type="text" value="0.50" readonly></div>
+      <div class="field"><label for="ductV">최소 반송속도 Vd (m/s)</label><input id="ductV" type="text" inputmode="decimal" value="5.0"></div>
+    </div>
+    <p class="hint">공식: Dmax = √(4Q ÷ (π × Vd,min)) × 1,000 (덕트 계산은 π = 3.14 적용). 후드 계산 결과 CMM을 60으로 나누어 Q(m³/s)로 자동 환산합니다. 결과는 이론상 최대 직경입니다.</p>
+    <div class="result" aria-live="polite" style="margin-top:12px">
+      <div class="result-label">최소 반송속도를 만족하는 이론상 최대 원형 덕트 직경</div>
+      <div class="big"><span id="ductD">356.82</span> mm</div>
+      <div class="result-label">표준 규격 중 이론상 최대 직경 이하에서 가장 큰 규격을 우선 추천합니다.</div>
+    </div>
+    <div class="result" aria-live="polite" style="margin-top:12px">
+      <div class="result-label">추천 상용 덕트 규격 (원형, 호칭 직경)</div>
+      <div class="big"><span id="commercialDuct">350</span> mm</div>
+      <div class="result-label">추천 규격 적용 시 실제 반송속도</div>
+      <div class="secondary"><span id="commercialVelocity">5.20</span> m/s</div>
+      <p class="hint" id="commercialNote" style="margin-bottom:0">계산값 이하의 표준 규격을 추천합니다.</p>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label for="ductSizeSelect">표준 덕트 규격 직접 선택</label>
+      <select id="ductSizeSelect"></select>
+    </div>
+    <p class="hint" style="margin-top:10px"><strong>계산기에서 사용하는 대표 규격(mm)</strong><br>
+      Ø10 · Ø15 · Ø20 · Ø25 · Ø32 · Ø40 · Ø50 · Ø65 · Ø80 · Ø90 · Ø100 · Ø125 · Ø150 · Ø200 · Ø250 · Ø300 · Ø350 · Ø400 · Ø450 · Ø500 · Ø550 · Ø600 · Ø650 · Ø750</p>
+    <div class="hint" id="selectedDuctResult" aria-live="polite">선택 규격의 실제 반송속도: 5.20 m/s</div>
+    <div id="ductError" class="hint hidden" role="alert" style="color:#a32222">후드 필요환기량이 유효하고 최소 반송속도 Vd는 0보다 커야 합니다.</div>
+  </section>
+
+  <section class="card" id="ductVelocityCard">
+    <h2>선정 덕트 계산 속도</h2>
+    <div class="result" aria-live="polite">
+      <div class="result-label">선정 덕트 계산 속도 V</div>
+      <div class="big"><span id="ductActualVelocity">—</span> m/s</div>
+    </div>
+    <p class="hint">위에서 선정(선택)한 상용 덕트 규격과 필요환기량으로 계산한 실제 반송속도입니다. 선정 덕트 규격 또는 필요환기량이 바뀌면 자동 갱신됩니다.</p>
+  </section>
+
+  <section class="card" id="ductPressureCard">
+    <h2>계산 속도압</h2>
+    <div class="result" aria-live="polite">
+      <div class="result-label">계산 속도압 VP</div>
+      <div class="big"><span id="ductVelocityPressure">—</span> mmH₂O</div>
+    </div>
+    <p class="hint">공식(표준 공기밀도 가정): VP = (V ÷ 4.043)² mmH₂O. 위 선정 덕트 계산 속도로 자동 산출합니다. 이는 속도압이며, 덕트·엘보·후드 등의 전체 압력손실이나 팬 정압과는 다릅니다.</p>
+  </section>
+
+  <section class="card" id="vpReverseCard">
+    <h2>속도압 직접 입력 (별도 역산)</h2>
+    <p class="hint" style="margin-top:0">속도압 VP를 직접 입력하면 V = 4.043 × √VP 로 속도를 역산합니다. 위의 덕트 선정 결과와는 별개로 계산되며 덕트 선정에는 반영되지 않습니다.</p>
+    <div class="fields">
+      <div class="field"><label for="vpDirect">속도압 VP (mmH₂O)</label><input id="vpDirect" type="text" inputmode="decimal" placeholder="예: 1.0"></div>
+    </div>
+    <div id="vpDirectError" class="hint hidden" role="alert" style="color:#a32222">속도압은 0 이상의 숫자로 입력해 주세요.</div>
+    <div class="result" aria-live="polite" style="margin-top:12px">
+      <div class="result-label">입력한 속도압으로 역산한 속도 V</div>
+      <div class="big"><span id="vpDirectVelocity">—</span> m/s</div>
+      <div class="result-label">속도압 환산</div>
+      <div><span id="vpDirectPa">—</span> Pa</div>
+    </div>
+    <p class="hint">공식(표준 공기밀도 가정): V = 4.043 × √VP (V: m/s, VP: mmH₂O), Pa = VP × 9.80665. 공기 밀도·온도·압력에 대한 별도 보정은 하지 않습니다.</p>
+  </section>
+
+  <section class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h2 style="margin:0">계산 이력</h2>
+      <button id="clearHistory" class="danger">이력 삭제</button>
+    </div>
+    <div id="history" style="margin-top:8px"><p class="hint">저장된 계산 이력이 없습니다.</p></div>
+  </section>
+</main>
+<footer>
+  참고: 이 계산기는 입력된 공식에 따른 계산 보조 도구입니다. 상용 덕트 규격은 대표적인 원형 호칭 직경 목록을 기준으로 추천하므로, 실제 설계 전에는 제조사 규격·덕트 내경·압력손실·분진 특성·법정 기준을 확인하십시오. 공식의 적용 조건, 단위 및 환산계수도 원본 기준과 대조하십시오. 브라우저의 로컬 저장소를 사용하므로 이력은 해당 기기·브라우저에 저장됩니다.
+</footer>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const num = id => {
+    const raw = $(id).value.trim().replace(/,/g, ".");
+    if (raw === "") return NaN;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : NaN;
+  };
+  const fmt = n => n.toLocaleString("ko-KR", {minimumFractionDigits:2, maximumFractionDigits:2});
+  const fmt3 = n => n.toLocaleString("ko-KR", {minimumFractionDigits:3, maximumFractionDigits:3});
+  const fmt6 = n => n.toLocaleString("ko-KR", {minimumFractionDigits:6, maximumFractionDigits:6});
+  const DUCT_PI = 3.14; // 덕트 계산(최대 직경·속도)에 사용하는 π
+  const getHood = () => document.querySelector('input[name="hood"]:checked').value;
+  const getShape = () => document.querySelector('input[name="shape"]:checked').value;
+  let current = {q:30, hood:"booth", label:"부스식/밀폐식"};
+
+  function updateVisibility() {
+    const hood = getHood();
+    $("boothFields").classList.toggle("hidden", hood !== "booth");
+    $("externalFields").classList.toggle("hidden", hood !== "external");
+    $("canopyFields").classList.toggle("hidden", hood !== "canopy");
+    const type = $("externalType").value;
+    const slot = type === "slot" || type === "flangeSlot";
+    $("shapeGroup").classList.toggle("hidden", slot);
+    $("rectWidthField").classList.toggle("hidden", slot || getShape() !== "rectangle");
+    $("rectHeightField").classList.toggle("hidden", slot || getShape() !== "rectangle");
+    $("diameterField").classList.toggle("hidden", slot || getShape() !== "circle");
+    $("lengthField").classList.toggle("hidden", !slot);
+    $("externalHint").textContent = slot
+      ? "공식: 슬롯형 Q = 3.7 × L × V × X, 플랜지 슬롯형 Q = 2.6 × L × V × X. 제시된 계수 기준으로 CMM을 직접 계산합니다."
+      : "사각형 개구면적 A = 가로 W × 높이 H, 원형 개구면적 A = π × 지름² ÷ 4로 계산합니다. 일반형 계열은 원식 결과가 m³/s라는 전제하에 ×60을 적용합니다.";
+  }
+  function calculate() {
+    updateVisibility();
+    const hood = getHood();
+    let q = NaN, label = "";
+    if (hood === "booth") {
+      const V=num("boothV"), W=num("boothW"), H=num("boothH");
+      q=V*W*H*60; label="부스식/밀폐식";
+    } else if (hood === "external") {
+      const type=$("externalType").value, V=num("externalV"), X=num("x");
+      if (type === "slot") { q=3.7*num("length")*V*X; label="외부식 - 슬롯형"; }
+      else if (type === "flangeSlot") { q=2.6*num("length")*V*X; label="외부식 - 플랜지 슬롯형"; }
+      else {
+        const A = getShape() === "circle" ? Math.PI*Math.pow(num("diameter"),2)/4 : num("rectWidth")*num("rectHeight");
+        q=(type === "flangeGeneral" ? 0.75 : 1)*V*(10*X*X+A)*60;
+        label=type === "flangeGeneral" ? "외부식 - 플랜지 일반형" : "외부식 - 일반형";
+      }
+    } else {
+      q=1.4*num("perimeter")*num("canopyV")*num("distanceD"); label="캐노피형";
+    }
+    const valid = Number.isFinite(q) && q >= 0;
+    $("error").classList.toggle("hidden", valid);
+    if (valid) {
+      current={q, hood, label};
+      $("cmm").textContent=fmt(q);
+      $("hourly").textContent=fmt(q*60);
+    } else {
+      $("cmm").textContent="—";
+      $("hourly").textContent="—";
+    }
+    // 후드 필요환기량(CMM)을 m³/s로 환산해 덕트 최대 직경 계산기에 자동 연결
+    $("ductQ").value = valid ? (q / 60).toFixed(6) : "";
+    calculateDuctDiameter();
+  }
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem("ventCalcHistory") || "[]"); } catch { return []; }
+  }
+  function renderHistory() {
+    const hist=loadHistory(), box=$("history");
+    box.replaceChildren();
+    if (!hist.length) { const p=document.createElement("p"); p.className="hint"; p.textContent="저장된 계산 이력이 없습니다."; box.appendChild(p); return; }
+    hist.forEach(item => {
+      const div=document.createElement("div"); div.className="history-item";
+      const title=document.createElement("div"); title.className="history-title"; title.textContent=item.label;
+      const value=document.createElement("div"); value.className="history-value"; value.textContent=`${item.cmm} CMM · ${item.hourly} m³/h`;
+      const date=document.createElement("div"); date.className="hint"; date.textContent=item.date;
+      div.append(title,value,date); box.appendChild(div);
+    });
+  }
+  document.querySelectorAll('input[name="hood"],input[name="shape"]').forEach(el=>el.addEventListener("change",calculate));
+  document.querySelectorAll("input[type=text]:not(#vpDirect),select:not(#ductSizeSelect)").forEach(el=>el.addEventListener("input",calculate));
+  $("externalType").addEventListener("change",calculate);
+  $("saveHistory").addEventListener("click",()=>{
+    calculate();
+    if (!Number.isFinite(current.q)) return;
+    const hist=loadHistory();
+    hist.unshift({label:current.label,cmm:fmt(current.q),hourly:fmt(current.q*60),date:new Date().toLocaleString("ko-KR")});
+    localStorage.setItem("ventCalcHistory",JSON.stringify(hist.slice(0,20)));
+    renderHistory();
+  });
+  $("copyResult").addEventListener("click",async()=>{
+    calculate();
+    if (!Number.isFinite(current.q)) return;
+    const text=`${current.label}\n필요환기량: ${fmt(current.q)} CMM\n시간당 환기량: ${fmt(current.q*60)} m³/h`;
+    try { await navigator.clipboard.writeText(text); $("copyResult").textContent="복사 완료"; setTimeout(()=>$("copyResult").textContent="결과 복사",1600); }
+    catch { window.prompt("아래 결과를 복사하세요.",text); }
+  });
+  // 대표적인 원형 상용 덕트 호칭 직경(mm). 실제 공급 규격은 제조사/현장 기준을 확인합니다.
+  // 상용 덕트 규격표(호칭 inch ↔ mm). 계산된 최대 직경 이하에서 가장 큰 규격을 선정합니다.
+  const ductInch = {10:"3/8",15:"1/2",20:"3/4",25:"1",32:"1-1/4",40:"1-1/2",50:"2",65:"2-1/2",80:"3",90:"3-1/2",100:"4",125:"5",150:"6",200:"8",250:"10",300:"12",350:"14",400:"16",450:"18",500:"20",550:"22",600:"24",650:"26",750:"30"};
+  const commercialDuctSizes = Object.keys(ductInch).map(Number).sort((a, b) => a - b);
+  let manualPick = null;      // 사용자가 목록에서 직접 고른 규격(없으면 null → 추천 규격을 선정)
+  let lastRecommended = null; // 가장 최근에 계산된 추천 규격
+  function velocityAtDiameter(q, diameterMm) {
+    const d = diameterMm / 1000;
+    return q / (DUCT_PI * d * d / 4);
+  }
+  function calculateDuctDiameter() {
+    const qRaw = $("ductQ").value.trim().replace(/,/g, ".");
+    const vRaw = $("ductV").value.trim().replace(/,/g, ".");
+    const q = qRaw === "" ? NaN : Number(qRaw);
+    const v = vRaw === "" ? NaN : Number(vRaw);
+    const valid = Number.isFinite(q) && q >= 0 && Number.isFinite(v) && v > 0;
+    $("ductError").classList.toggle("hidden", valid);
+    if (!valid) {
+      $("ductD").textContent = "—";
+      $("commercialDuct").textContent = "—";
+      $("commercialVelocity").textContent = "—";
+      $("commercialNote").textContent = "입력값을 확인하세요.";
+      $("selectedDuctResult").textContent = "선택 규격의 실제 반송속도: —";
+      $("ductActualVelocity").textContent = "—";
+      $("ductVelocityPressure").textContent = "—";
+      return;
+    }
+
+    const dMax = Math.sqrt((4 * q) / (DUCT_PI * v)) * 1000;
+    $("ductD").textContent = fmt(dMax);
+
+    const select = $("ductSizeSelect");
+    const fitting = commercialDuctSizes.filter(d => d <= dMax);
+    const recommended = fitting.length ? fitting[fitting.length - 1] : null;
+
+    // Keep the list of standard sizes up to the calculated maximum, so every selectable
+    // size satisfies the minimum transport velocity (subject to the chosen assumptions).
+    const allowed = commercialDuctSizes.filter(d => d <= dMax);
+    select.replaceChildren();
+    if (!allowed.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "조건에 맞는 규격 없음";
+      select.appendChild(option);
+      select.disabled = true;
+      $("commercialDuct").textContent = "—";
+      $("commercialVelocity").textContent = "—";
+      $("commercialNote").textContent = "계산된 최대 직경보다 작은 대표 규격이 없습니다. 풍량·속도 조건과 공급 규격을 확인하세요.";
+      $("selectedDuctResult").textContent = "선택 규격의 실제 반송속도: —";
+      $("ductActualVelocity").textContent = "—";
+      $("ductVelocityPressure").textContent = "—";
+      return;
+    }
+
+    select.disabled = false;
+    allowed.forEach(d => {
+      const option = document.createElement("option");
+      option.value = String(d);
+      option.textContent = `Ø${d} mm (${ductInch[d]} inch)`;
+      select.appendChild(option);
+    });
+    // 직접 고른 규격이 없으면 항상 추천 규격을 선정(입력 도중 거친 값의 이전 선택이 남지 않도록 함)
+    lastRecommended = recommended;
+    if (manualPick !== null && !allowed.includes(manualPick)) manualPick = null;
+    const chosen = manualPick !== null ? manualPick : recommended;
+    select.value = String(chosen);
+
+    $("commercialDuct").textContent = String(recommended);
+    $("commercialVelocity").textContent = fmt3(velocityAtDiameter(q, recommended));
+    $("commercialNote").textContent = `규격표 Ø${recommended} mm(${ductInch[recommended]} inch)를 추천합니다. 제조사별 실제 호칭 규격과 압력손실을 확인하세요.` +
+      (dMax > commercialDuctSizes[commercialDuctSizes.length - 1] ? " 계산된 최대 직경이 규격표의 최대 규격을 넘어, 표의 최대 규격을 기준으로 표시합니다." : "");
+    updateSelectedDuctVelocity();
+  }
+  function updateSelectedDuctVelocity() {
+    const qRaw = $("ductQ").value.trim().replace(/,/g, ".");
+    const q = qRaw === "" ? NaN : Number(qRaw);
+    const d = Number($("ductSizeSelect").value);
+    if (!Number.isFinite(q) || q < 0 || !Number.isFinite(d) || d <= 0) {
+      $("selectedDuctResult").textContent = "선택 규격의 실제 반송속도: —";
+      // 이전 계산값이 남아 있지 않도록 속도·속도압 표시도 함께 비움
+      $("ductActualVelocity").textContent = "—";
+      $("ductVelocityPressure").textContent = "—";
+      return;
+    }
+    const velocity = velocityAtDiameter(q, d);
+    const vMinRaw = $("ductV").value.trim().replace(/,/g, ".");
+    const vMin = Number(vMinRaw);
+    const status = velocity >= vMin ? "최소 반송속도 충족" : "최소 반송속도 미달";
+    $("selectedDuctResult").textContent = `선택 규격 Ø${d} mm의 실제 반송속도: ${fmt3(velocity)} m/s · ${status}`;
+
+    // 선택된 상용 덕트의 계산 속도를 속도압 계산으로 자동 연결
+    const vpMmH2O = Math.pow(velocity / 4.043, 2);
+    $("ductActualVelocity").textContent = fmt3(velocity);
+    $("ductVelocityPressure").textContent = fmt6(vpMmH2O);
+  }
+  $("ductV").addEventListener("input", calculateDuctDiameter);
+  $("ductSizeSelect").addEventListener("change", () => {
+    const picked = Number($("ductSizeSelect").value);
+    manualPick = picked === lastRecommended ? null : picked;
+    updateSelectedDuctVelocity();
+  });
+  calculateDuctDiameter();
+
+  // 속도압 직접 입력 → 속도 역산 (덕트 선정과 독립된 계산): V = 4.043 × √VP
+  function calculateVelocityFromPressure() {
+    const raw = $("vpDirect").value.trim().replace(/,/g, ".");
+    const vp = raw === "" ? NaN : Number(raw);
+    const empty = raw === "";
+    const valid = Number.isFinite(vp) && vp >= 0;
+    $("vpDirectError").classList.toggle("hidden", empty || valid);
+    if (!valid) {
+      $("vpDirectVelocity").textContent = "—";
+      $("vpDirectPa").textContent = "—";
+      return;
+    }
+    $("vpDirectVelocity").textContent = fmt3(4.043 * Math.sqrt(vp));
+    $("vpDirectPa").textContent = fmt(vp * 9.80665);
+  }
+  $("vpDirect").addEventListener("input", calculateVelocityFromPressure);
+  calculateVelocityFromPressure();
+
+  $("clearHistory").addEventListener("click",()=>{ if(confirm("저장된 계산 이력을 모두 삭제할까요?")) {localStorage.removeItem("ventCalcHistory");renderHistory();} });
+  $("reset").addEventListener("click",()=>{
+    manualPick = null;
+    document.querySelector('input[name="hood"][value="booth"]').checked=true;
+    document.querySelector('input[name="shape"][value="rectangle"]').checked=true;
+    $("boothV").value="0.5"; $("boothW").value="1"; $("boothH").value="1";
+    $("externalType").value="general"; $("rectWidth").value="1"; $("rectHeight").value="1"; $("diameter").value="1"; $("externalV").value="0.5"; $("x").value="0.3"; $("length").value="1";
+    $("perimeter").value="4"; $("canopyV").value="0.5"; $("distanceD").value="0.5";
+    calculate();
+  });
+  calculate(); renderHistory();
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(()=>{}));
+  }
+})();
+</script>
+</body>
+</html>
